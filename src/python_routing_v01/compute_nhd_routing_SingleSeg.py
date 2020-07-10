@@ -138,8 +138,6 @@ def compute_network(
     terminal_segment=None,
     network=None,
     supernetwork_data=None,
-    nts=0,
-    dt=0,
     verbose=False,
     debuglevel=0,
     write_output=False,
@@ -157,6 +155,12 @@ def compute_network(
         if reach["seqorder"] not in ordered_reaches:
             ordered_reaches.update({reach["seqorder"]: []})
         ordered_reaches[reach["seqorder"]].append([head_segment, reach])
+
+    # initialize flowveldepth dict
+    # nts = 50  # one timestep
+    nts = 144  # test with dt =10
+    dt = 300  # in seconds
+    # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
 
     # initialize write to files variable
     writeToCSV = True
@@ -320,7 +324,7 @@ def printarray(
     global flowveldepth
 
     # define CSV file Header
-    header = [["time", "qlat", "q", "v", "d"]]
+    header = [["time", "qlat", "q", "d", "v"]]
 
     # Loop over reach segments
     current_segment = reach["reach_head"]
@@ -338,8 +342,8 @@ def printarray(
                     flowveldepth[current_segment]["time"],
                     flowveldepth[current_segment]["qlatval"],
                     flowveldepth[current_segment]["flowval"],
-                    flowveldepth[current_segment]["velval"],
                     flowveldepth[current_segment]["depthval"],
+                    flowveldepth[current_segment]["velval"],
                 )
             )
 
@@ -643,32 +647,34 @@ def main():
             "qlatval": [],
             "time": [],
             "flowval": [],
-            "velval": [],
             "depthval": [],
+            "velval": [],
         }
         for connection in connections
     }
 
     # Lateral flow
     ## test 1. Take lateral flow from wrf-hydro output from Pocono Basin
-    TEST = True
-    # initialize flowveldepth dict
-    # nts = 50  # one timestep
-    nts = 144  # test with dt =10
-    dt = 300  # in seconds
-    # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
-    if TEST == True:
+    ql_input_folder = os.path.join(
+        root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
+    )
+    ql = pd.read_csv(ql_input_folder, index_col=0)
 
-        ql_input_folder = os.path.join(
-            root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
-        )
-        ql = pd.read_csv(ql_input_folder, index_col=0)
+    for index, row in ql.iterrows():
+        # print(index, row.to_numpy())
+        flowveldepth[index]["qlatval"] = row.to_numpy().tolist()
 
-        for index, row in ql.iterrows():
-            # print(index, row.to_numpy())
-            flowveldepth[index]["qlatval"] = row.to_numpy().tolist()
+    # qlcol = 54
+    # qlrow = 144
+    # ql = np.zeros((qlrow, qlcol))
+    # ql_input_folder = os.path.join(root, r'./test/input/text/Pocono_ql_testsamp1_nwm_mc.txt')
+    # for j in range(0, qlcol):
+    #     ql[0, j] = int(np.loadtxt(ql_input_folder, max_rows=1, usecols=(j + 2)))
+    #     ql[1:, j] = np.loadtxt(ql_input_folder, skiprows=2, usecols=(j + 2))
+    # for j in range(0, qlcol):
+    #     flowveldepth[int(ql[0, j])]['qlatval'] = ql[1:, j].tolist()
 
-    parallelcompute = False
+    parallelcompute = True
     if not parallelcompute:
         if verbose:
             print("executing computation on ordered reaches ...")
@@ -678,8 +684,6 @@ def main():
                 terminal_segment=terminal_segment,
                 network=network,
                 supernetwork_data=supernetwork_data,
-                nts=nts,
-                dt=dt,
                 verbose=False,
                 debuglevel=debuglevel,
                 write_output=write_output,
@@ -699,8 +703,6 @@ def main():
                 terminal_segment,
                 network,
                 supernetwork_data,  # TODO: This should probably be global...
-                nts,
-                dt,
                 False,
                 debuglevel,
                 write_output,
