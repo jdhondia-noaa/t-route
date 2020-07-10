@@ -117,7 +117,6 @@ def _handle_args():
         default="Pocono_TEST1",
     )
     parser.add_argument(
-        "-p",
         "--parallel",
         help="Use the parallel computation engine (omit flag for serial computation)",
         dest="parallel_compute",
