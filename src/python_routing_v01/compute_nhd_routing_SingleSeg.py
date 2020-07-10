@@ -33,28 +33,35 @@ def _handle_args():
         action="store_true",
     )
     parser.add_argument(
-        "--assume_short_ts",
+        "-sts" "--assume-short-ts",
         help="Use the previous timestep value for upstream flow",
         dest="assume_short_ts",
         action="store_true",
     )
     parser.add_argument(
-        "-o",
-        "--write_output",
-        help="Write output files (leave blank for no writing)",
-        dest="write_output",
+        "-ocsv",
+        "--write-output-csv",
+        help="Write csv output files (omit flag for no csv writing)",
+        dest="write_csv_output",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-onc",
+        "--write-output-nc",
+        help="Write netcdf output files (omit flag for no netcdf writing)",
+        dest="write_nc_output",
         action="store_true",
     )
     parser.add_argument(
         "-t",
         "--showtiming",
-        help="Set the showtiming (leave blank for no timing information)",
+        help="Set the showtiming (omit flag for no timing information)",
         dest="showtiming",
         action="store_true",
     )
     parser.add_argument(
         "-w",
-        "--break_at_waterbodies",
+        "--break-at-waterbodies",
         help="Use the waterbodies in the route-link dataset to divide the computation (leave blank for no splitting)",
         dest="break_network_at_waterbodies",
         action="store_true",
@@ -81,15 +88,18 @@ def _handle_args():
         dest="supernetwork",
         default="Pocono_TEST1",
     )
+    parser.add_argument(
+        "-p",
+        "--parallel",
+        help="Use the parallel computation engine (omit flag for serial computation)",
+        dest="parallel_compute",
+        action="store_true",
+    )
 
     return parser.parse_args()
 
 
-ENV_IS_CL = False
-if ENV_IS_CL:
-    root = "/content/wrf_hydro_nwm_public/trunk/NDHMS/dynamic_channel_routing/"
-elif not ENV_IS_CL:
-    root = os.path.dirname(os.path.dirname((os.path.abspath(""))))
+root = os.path.dirname(os.path.dirname((os.path.abspath(""))))
 
 sys.setrecursionlimit(4000)
 sys.path.append(os.path.join(root, r"src", r"python_framework_v01"))
@@ -142,7 +152,8 @@ def compute_network(
     dt=0,
     verbose=False,
     debuglevel=0,
-    write_output=False,
+    write_csv_output=False,
+    write_nc_output=False,
     assume_short_ts=False,
 ):
     global connections
@@ -159,8 +170,8 @@ def compute_network(
         ordered_reaches[reach["seqorder"]].append([head_segment, reach])
 
     # initialize write to files variable
-    writeToCSV = True
-    writeToNETCDF = True
+    writeToCSV = write_csv_output
+    writeToNETCDF = write_nc_output
     pathToOutputFile = os.path.join(root, "test", "output", "text")
 
     for ts in range(0, nts):
@@ -175,7 +186,6 @@ def compute_network(
                     dt=dt,
                     verbose=verbose,
                     debuglevel=debuglevel,
-                    write_output=write_output,
                     assume_short_ts=assume_short_ts,
                 )
 
@@ -209,7 +219,6 @@ def compute_mc_reach_up2down(
     dt=60,
     verbose=False,
     debuglevel=0,
-    write_output=False,
     assume_short_ts=False,
 ):
     global connections
@@ -583,8 +592,10 @@ def main():
     showtiming = args.showtiming
     supernetwork = args.supernetwork
     break_network_at_waterbodies = args.break_network_at_waterbodies
-    write_output = args.write_output
+    write_csv_output = args.write_csv_output
+    write_nc_output = args.write_nc_output
     assume_short_ts = args.assume_short_ts
+    parallel_compute = args.parallel_compute
 
     test_folder = os.path.join(root, r"test")
     geo_input_folder = os.path.join(test_folder, r"input", r"geo")
@@ -669,23 +680,14 @@ def main():
         # print(index, row.to_numpy())
         flowveldepth[index]["qlatval"] = row.to_numpy().tolist()
 
-    # qlcol = 54
-    # qlrow = 144
-    # ql = np.zeros((qlrow, qlcol))
-    # ql_input_folder = os.path.join(root, r'./test/input/text/Pocono_ql_testsamp1_nwm_mc.txt')
-    # for j in range(0, qlcol):
-    #     ql[0, j] = int(np.loadtxt(ql_input_folder, max_rows=1, usecols=(j + 2)))
-    #     ql[1:, j] = np.loadtxt(ql_input_folder, skiprows=2, usecols=(j + 2))
-    # for j in range(0, qlcol):
-    #     flowveldepth[int(ql[0, j])]['qlatval'] = ql[1:, j].tolist()
-
-    parallelcompute = False
-    if not parallelcompute:
+    if not parallel_compute:
         if verbose:
             print("executing computation on ordered reaches ...")
 
         for terminal_segment, network in networks.items():
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
             compute_network(
                 terminal_segment=terminal_segment,
                 network=network,
@@ -694,13 +696,14 @@ def main():
                 dt=dt,
                 verbose=False,
                 debuglevel=debuglevel,
-                write_output=write_output,
+                write_csv_output=write_csv_output,
+                write_nc_output=write_nc_output,
                 assume_short_ts=assume_short_ts,
             )
             print(f"{terminal_segment}")
             if showtiming:
                 print("... in %s seconds." % (time.time() - start_time))
-    else:
+    else:  # serial execution
         if verbose:
             print(f"executing parallel computation on ordered reaches .... ")
         # for terminal_segment, network in networks.items():
@@ -715,7 +718,8 @@ def main():
                 dt,
                 False,
                 debuglevel,
-                write_output,
+                write_csv_output,
+                write_nc_output,
                 assume_short_ts,
             ]
             for terminal_segment, network in networks.items()
