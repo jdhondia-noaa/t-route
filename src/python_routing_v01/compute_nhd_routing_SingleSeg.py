@@ -223,7 +223,6 @@ def compute_mc_reach_up2down(
     # upstream flow per reach
     qup = 0.0
     quc = 0.0
-    # import pdb; pdb.set_trace()
     if reach["upstream_reaches"] != {
         supernetwork_data["terminal_code"]
     }:  # Not Headwaters
@@ -243,11 +242,11 @@ def compute_mc_reach_up2down(
 
         # for now treating as constant per reach
         bw = data[supernetwork_data["bottomwidth_col"]]
-        tw = 0.01 * bw  # data[supernetwork_data["topwidth_col"]]
-        twcc = tw  # data[supernetwork_data["topwidthcc_col"]]
+        tw = data[supernetwork_data["topwidth_col"]]
+        twcc = data[supernetwork_data["topwidthcc_col"]]
         dx = data[supernetwork_data["length_col"]]
         n_manning = data[supernetwork_data["manningn_col"]]
-        n_manning_cc = n_manning  # data[supernetwork_data["manningncc_col"]]
+        n_manning_cc = data[supernetwork_data["manningncc_col"]]
         cs = data[supernetwork_data["ChSlp_col"]]
         s0 = data[supernetwork_data["slope_col"]]
 
@@ -321,7 +320,7 @@ def printarray(
     global flowveldepth
 
     # define CSV file Header
-    header = [["time", "qlat", "q", "d", "v"]]
+    header = [["time", "qlat", "q", "v", "d"]]
 
     # Loop over reach segments
     current_segment = reach["reach_head"]
@@ -339,8 +338,8 @@ def printarray(
                     flowveldepth[current_segment]["time"],
                     flowveldepth[current_segment]["qlatval"],
                     flowveldepth[current_segment]["flowval"],
-                    flowveldepth[current_segment]["depthval"],
                     flowveldepth[current_segment]["velval"],
+                    flowveldepth[current_segment]["depthval"],
                 )
             )
 
@@ -427,7 +426,6 @@ def writeArraytoNC(
                 current_segment = next_segment
 
     # check number of timesteps should match the time the data is written
-    import pdb; pdb.set_trace()
     if int(len(flowveldepth_data["time"][0])) != int(nts):
         print(
             f"Number of timesteps  {nts} does not match data timesteps {len(flowveldepth_data['time'][0])}\n"
@@ -645,19 +643,8 @@ def main():
             "qlatval": [],
             "time": [],
             "flowval": [],
-            "depthval": [],
             "velval": [],
-        }
-        for connection in connections
-    }
-
-    flowveldepth_OLD = {
-        connection: {
-            "qlatval": [],
-            "time": [],
-            "flowval": [],
             "depthval": [],
-            "velval": [],
         }
         for connection in connections
     }
@@ -672,7 +659,6 @@ def main():
     # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
     if TEST == True:
 
-        # NEW WAY
         ql_input_folder = os.path.join(
             root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
         )
