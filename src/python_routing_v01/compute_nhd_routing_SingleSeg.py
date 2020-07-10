@@ -34,6 +34,12 @@ def _handle_args():
         action="store_true",
     )
     parser.add_argument(
+        "--test" "--run-pocono-test-example",
+        help="Use the data values stored in the repository for a test of the Pocono network",
+        dest="run_pocono_test",
+        action="store_true",
+    )
+    parser.add_argument(
         "-sts" "--assume-short-ts",
         help="Use the previous timestep value for upstream flow",
         dest="assume_short_ts",
@@ -52,6 +58,27 @@ def _handle_args():
         help="Write netcdf output files (omit flag for no netcdf writing)",
         dest="write_nc_output",
         action="store_true",
+    )
+    parser.add_argument(
+        "--dt",
+        "--time-step",
+        help="Set the default timestep length",
+        dest="dt",
+        default=300,
+    )
+    parser.add_argument(
+        "--nts",
+        "--number-of-timesteps",
+        help="Set the number of timesteps to execute",
+        dest="nts",
+        default=144,
+    )
+    parser.add_argument(
+        "--ql",
+        "--constant_qlateral",
+        help="Set the number of timesteps to execute",
+        dest="qlat_const",
+        default=10,
     )
     parser.add_argument(
         "-t",
@@ -160,9 +187,8 @@ def compute_network(
     global connections
     global flowveldepth
 
-    # print(tuple(([x for x in network.keys()][i], [x for x in network.values()][i]) for i in range(len(network))))
-
-    # if verbose: print(f"\nExecuting simulation on network {terminal_segment} beginning with streams of order {network['maximum_order']}")
+    if debuglevel <= -1: 
+        print(f"\nExecuting simulation on network {terminal_segment} beginning with streams of order {network['maximum_order']}")
 
     ordered_reaches = {}
     for head_segment, reach in network["reaches"].items():
@@ -225,7 +251,7 @@ def compute_mc_reach_up2down(
     global connections
     global flowveldepth
 
-    if verbose:
+    if debuglevel <= -2:
         print(
             f"\nreach: {head_segment} (order: {reach['seqorder']} n_segs: {len(reach['segments'])})"
         )
@@ -238,7 +264,6 @@ def compute_mc_reach_up2down(
         if reach["upstream_reaches"] != {
             supernetwork_data["terminal_code"]
         }:  # Not Headwaters
-            # import pdb; pdb.set_trace()
             for us in connections[reach["reach_head"]]["upstreams"]:
                 qup += flowveldepth[us]["flowval"][-2]
                 quc += flowveldepth[us]["flowval"][-1]
@@ -308,15 +333,15 @@ def compute_mc_reach_up2down(
         flowveldepth[current_segment]["velval"].append(velc)
         flowveldepth[current_segment]["time"].append(ts * dt)
 
+        next_segment = connections[current_segment]["downstream"]
         if current_segment == reach["reach_tail"]:
-            if verbose:
+            if debuglevel <= -2:
                 print(f"{current_segment} (tail)")
             break
-        if verbose:
+        if debuglevel <= -3:
             print(f"{current_segment} --> {next_segment}\n")
         # current_segment = next_segment
         # next_segment = connections[current_segment]["downstream"]
-        next_segment = connections[current_segment]["downstream"]
         current_segment = next_segment
     # end loop initialized the MC vars
     # end while loop
@@ -342,7 +367,7 @@ def printarray(
     while True:
         filename = f"{pathToOutputFile}/{current_segment}.csv"  #
         if verbose:
-            print(f"printing to --> {filename} \n")
+            print(f"writing segment output to --> {filename}")
         with open(filename, "w+") as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=",", quoting=csv.QUOTE_ALL)
             csvwriter.writerows(header)
@@ -357,10 +382,10 @@ def printarray(
             )
 
         if current_segment == reach["reach_tail"]:
-            if verbose:
+            if debuglevel <= -2:
                 print(f"{current_segment} (tail)")
             break
-        if verbose:
+        if debuglevel <= -3:
             print(f"{current_segment} --> {next_segment}\n")
         current_segment = next_segment
         next_segment = connections[current_segment]["downstream"]
@@ -430,11 +455,11 @@ def writeArraytoNC(
 
                 if current_segment == reach["reach_tail"]:
                     write_segment = current_segment
-                    if verbose:
+                    if debuglevel <= -2:
                         print(f"{current_segment} (tail)")
                     break
                 next_segment = connections[current_segment]["downstream"]
-                if verbose:
+                if debuglevel <= -3:
                     print(f"{current_segment} --> {next_segment}\n")
                 current_segment = next_segment
 
@@ -473,6 +498,8 @@ def writeNC(
 ):
     # start writing data to nc file
     filename = f"{pathToOutputFile}/{terminal_segment}.nc"  # ncfile'
+    if verbose:
+        print(f"writing netcdf output to --> {filename}")
     ncfile = netCDF4.Dataset(filename, mode="w", format="NETCDF4")
     # segcount = total segments for the current reach
     segcount = ncfile.createDimension("stations", segment_count)  # segment
@@ -535,7 +562,7 @@ def writeNC(
     analysistime[:] = 0
     #
     ncfile.close()
-    if verbose:
+    if debuglevel <= -1:
         print(f"{filename} closed!")
 
 
@@ -588,18 +615,40 @@ def main():
     global networks
     global flowveldepth
 
+
+    supernetwork = args.supernetwork
+    break_network_at_waterbodies = args.break_network_at_waterbodies
+
+    dt = float(args.dt)
+    nts = int(args.nts)
+    qlat_const = float(args.qlat_const)
+     
     debuglevel = -1 * int(args.debuglevel)
     verbose = args.verbose
     showtiming = args.showtiming
-    supernetwork = args.supernetwork
-    break_network_at_waterbodies = args.break_network_at_waterbodies
     write_csv_output = args.write_csv_output
     write_nc_output = args.write_nc_output
     assume_short_ts = args.assume_short_ts
     parallel_compute = args.parallel_compute
 
+    run_pocono_test=args.run_pocono_test
+
+    if run_pocono_test:
+        if verbose:
+            print('running test case for Pocono_TEST2 domain')
+        # Overwrite the following test defaults
+        supernetwork = 'Pocono_TEST2'
+        break_network_at_waterbodies = False
+        dt = 300
+        nts = 144
+        write_csv_output = True
+        write_nc_output = True
+
+
+
     test_folder = os.path.join(root, r"test")
     geo_input_folder = os.path.join(test_folder, r"input", r"geo")
+
 
     # TODO: Make these commandline args
     """##NHD Subset (Brazos/Lower Colorado)"""
@@ -653,6 +702,7 @@ def main():
 
     connections = supernetwork_values[0]
 
+    # initialize flowveldepth dict
     flowveldepth = {
         connection: {
             "qlatval": [],
@@ -665,20 +715,17 @@ def main():
     }
 
     # Lateral flow
-    ## test 1. Take lateral flow from wrf-hydro output from Pocono Basin
-    # initialize flowveldepth dict
-    # nts = 50  # one timestep
-    nts = 144  # test with dt =10
-    dt = 300  # in seconds
-    # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
+    if run_pocono_test: # test 1. Take lateral flow from wrf-hydro output from Pocono Basin
+        ql_input_folder = os.path.join(
+            root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
+        )
+        ql = pd.read_csv(ql_input_folder, index_col=0)
 
-    ql_input_folder = os.path.join(
-        root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
-    )
-    ql = pd.read_csv(ql_input_folder, index_col=0)
+    else:
+        q = np.full((len(connections), nts), qlat_const, dtype='float32')
+        ql = pd.DataFrame(q, index=connections.keys(), columns=range(nts))
 
     for index, row in ql.iterrows():
-        # print(index, row.to_numpy())
         flowveldepth[index]["qlatval"] = row.to_numpy().tolist()
 
     if not parallel_compute:
@@ -686,22 +733,20 @@ def main():
             print("executing computation on ordered reaches ...")
 
         for terminal_segment, network in networks.items():
-            import pdb
-
-            pdb.set_trace()
+            if verbose:
+                print(f"for network terminiating at segment {terminal_segment}")
             compute_network(
                 terminal_segment=terminal_segment,
                 network=network,
                 supernetwork_data=supernetwork_data,
                 nts=nts,
                 dt=dt,
-                verbose=False,
+                verbose=verbose,
                 debuglevel=debuglevel,
                 write_csv_output=write_csv_output,
                 write_nc_output=write_nc_output,
                 assume_short_ts=assume_short_ts,
             )
-            print(f"{terminal_segment}")
             if showtiming:
                 print("... in %s seconds." % (time.time() - start_time))
     else:  # serial execution
@@ -717,7 +762,7 @@ def main():
                 supernetwork_data,  # TODO: This should probably be global...
                 nts,
                 dt,
-                False,
+                verbose,
                 debuglevel,
                 write_csv_output,
                 write_nc_output,
