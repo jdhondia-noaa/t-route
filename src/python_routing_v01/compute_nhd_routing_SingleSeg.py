@@ -1,16 +1,17 @@
 # example usage: python compute_nhd_routing_SingleSeg.py -v -t -w -n Mainstems_CONUS
 
 ## Parallel execution
-import multiprocessing
-import pandas as pd
 import os
 import sys
 import time
-import csv
-import netCDF4
 import numpy as np
 import argparse
+import pathlib
+import pandas as pd
+import netCDF4
+import csv
 from datetime import datetime
+import multiprocessing
 
 
 def _handle_args():
@@ -99,7 +100,7 @@ def _handle_args():
     return parser.parse_args()
 
 
-root = os.path.dirname(os.path.dirname((os.path.abspath(""))))
+root = pathlib.Path("../..").resolve()
 
 sys.setrecursionlimit(4000)
 sys.path.append(os.path.join(root, r"src", r"python_framework_v01"))
