@@ -138,6 +138,8 @@ def compute_network(
     terminal_segment=None,
     network=None,
     supernetwork_data=None,
+    nts=0,
+    dt=0,
     verbose=False,
     debuglevel=0,
     write_output=False,
@@ -155,12 +157,6 @@ def compute_network(
         if reach["seqorder"] not in ordered_reaches:
             ordered_reaches.update({reach["seqorder"]: []})
         ordered_reaches[reach["seqorder"]].append([head_segment, reach])
-
-    # initialize flowveldepth dict
-    # nts = 50  # one timestep
-    nts = 144  # test with dt =10
-    dt = 300  # in seconds
-    # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
 
     # initialize write to files variable
     writeToCSV = True
@@ -227,12 +223,15 @@ def compute_mc_reach_up2down(
     # upstream flow per reach
     qup = 0.0
     quc = 0.0
-    if reach["upstream_reaches"] != {
-        supernetwork_data["terminal_code"]
-    }:  # Not Headwaters
-        for us in connections[reach["reach_head"]]["upstreams"]:
-            qup += flowveldepth[us]["flowval"][-1]
-            quc += flowveldepth[us]["flowval"][0]
+
+    if ts > 0:
+        if reach["upstream_reaches"] != {
+            supernetwork_data["terminal_code"]
+        }:  # Not Headwaters
+            # import pdb; pdb.set_trace()
+            for us in connections[reach["reach_head"]]["upstreams"]:
+                qup += flowveldepth[us]["flowval"][-2]
+                quc += flowveldepth[us]["flowval"][-1]
 
     if assume_short_ts:
         quc = qup
@@ -324,7 +323,7 @@ def printarray(
     global flowveldepth
 
     # define CSV file Header
-    header = [["time", "qlat", "q", "d", "v"]]
+    header = [["time", "qlat", "q", "v", "d"]]
 
     # Loop over reach segments
     current_segment = reach["reach_head"]
@@ -342,8 +341,8 @@ def printarray(
                     flowveldepth[current_segment]["time"],
                     flowveldepth[current_segment]["qlatval"],
                     flowveldepth[current_segment]["flowval"],
-                    flowveldepth[current_segment]["depthval"],
                     flowveldepth[current_segment]["velval"],
+                    flowveldepth[current_segment]["depthval"],
                 )
             )
 
@@ -647,14 +646,20 @@ def main():
             "qlatval": [],
             "time": [],
             "flowval": [],
-            "depthval": [],
             "velval": [],
+            "depthval": [],
         }
         for connection in connections
     }
 
     # Lateral flow
     ## test 1. Take lateral flow from wrf-hydro output from Pocono Basin
+    # initialize flowveldepth dict
+    # nts = 50  # one timestep
+    nts = 144  # test with dt =10
+    dt = 300  # in seconds
+    # nts = 1440 # number of  timestep = 1140 * 60(model timestep) = 86400 = day
+
     ql_input_folder = os.path.join(
         root, r"test/input/geo/PoconoSampleData2/Pocono_ql_testsamp1_nwm_mc.csv"
     )
@@ -674,16 +679,19 @@ def main():
     # for j in range(0, qlcol):
     #     flowveldepth[int(ql[0, j])]['qlatval'] = ql[1:, j].tolist()
 
-    parallelcompute = True
+    parallelcompute = False
     if not parallelcompute:
         if verbose:
             print("executing computation on ordered reaches ...")
 
         for terminal_segment, network in networks.items():
+            import pdb; pdb.set_trace()
             compute_network(
                 terminal_segment=terminal_segment,
                 network=network,
                 supernetwork_data=supernetwork_data,
+                nts=nts,
+                dt=dt,
                 verbose=False,
                 debuglevel=debuglevel,
                 write_output=write_output,
@@ -703,6 +711,8 @@ def main():
                 terminal_segment,
                 network,
                 supernetwork_data,  # TODO: This should probably be global...
+                nts,
+                dt,
                 False,
                 debuglevel,
                 write_output,
