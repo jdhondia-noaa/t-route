@@ -207,7 +207,6 @@ def compute_network(
     for ts in range(0, nts):
         for x in range(network["maximum_reach_seqorder"], -1, -1):
             for head_segment, reach in ordered_reaches[x]:
-
                 compute_mc_reach_up2down(
                     head_segment=head_segment,
                     reach=reach,
@@ -587,7 +586,6 @@ def singlesegment(
     velp=None,  # velocity at previous time step
     depthp=None,  # depth at previous time step
 ):
-
     # call Fortran routine
     return mc.muskingcungenwm(
         dt,
@@ -611,7 +609,6 @@ def singlesegment(
 
 # Main Routine
 def main():
-
     args = _handle_args()
 
     global connections
@@ -646,7 +643,6 @@ def main():
         nts = 144
         write_csv_output = True
         write_nc_output = True
-
 
 
     test_folder = os.path.join(root, r"test")
