@@ -25,7 +25,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     real(prec) :: bfd, WPC, AREAC, C1, C2, C3, C4
     integer :: iter
     integer :: maxiter, tries
-    real(prec) :: mindepth, aerror, rerror
+    real(prec) :: mindepth, aerror, rerror, epsilon
     real(prec) :: R, twl, h_1, h, h_0, Qj, Qj_0
 
     ! qdc = 0.0
@@ -38,9 +38,10 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
 
     aerror = 0.01_prec
     rerror = 1.0_prec
+    epsilon = 0.00001_prec
     tries = 0
 
-    if(cs .eq. 0.00000000_prec) then
+    if(cs .le. 0.00000000_prec) then
         z = 1.0_prec
     else
         z = 1.0_prec/cs          !channel side distance (m)
@@ -48,7 +49,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
 
     if(bw .gt. tw) then   !effectively infinite deep bankful
         bfd = bw/0.00001_prec
-    elseif (bw .eq. tw) then
+    elseif (Abs(bw - tw) .lt. epsilon) then
         bfd =  bw/(2.0_prec*z)  !bankfull depth is effectively
     else
         bfd =  (tw - bw)/(2.0_prec*z)  !bankfull depth (m)
@@ -63,8 +64,8 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     h     = (depthc * 1.33_prec) + mindepth !1.50 of  depthc
     h_0   = (depthc * 0.67_prec)            !0.50 of depthc
 
-    if(ql .gt. 0.0_prec .or. qup .gt. 0.0_prec .or. qdp .gt. 0.0_prec) then  !only solve if there's water to flux
-110 continue
+    if(ql .gt. 0.0_prec .or. qup .gt. 0.0_prec .or. quc .gt. 0.0_prec .or. qdp .gt. 0.0_prec) then  !only solve if there's water to flux
+110     continue
         Qj_0 = 0.0_prec
         WPC = 0.0_prec
         AREAC = 0.0_prec
@@ -74,15 +75,15 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
 
             call secant_h0(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
                 qdp, ql, qup, quc, h_0, WPC, Qj_0, C1, C2, C3, C4)
-      !subroutine secant_h0(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
+            !subroutine secant_h0(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
                 !qdp, ql, qup, quc, h_0, Qj_0)
 
             call secant_h(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
                 qdp, ql, qup, quc, h, WPC, Qj, C1, C2, C3, C4)
-      !subroutine secant_h(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
+            !subroutine secant_h(z, bw, bfd, twcc, s0, n, ncc, dt, dx, &
                 !qdp, ql, qup, quc, h, Qj)
 
-            if(Qj_0-Qj .ne. 0.0_prec) then
+            if(Abs(Qj_0-Qj) .ge. epsilon) then
                 h_1 = h - ((Qj * (h_0 - h))/(Qj_0 - Qj)) !update h, 3rd estimate
 
                 if(h_1 .lt. 0.0_prec) then
@@ -98,6 +99,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
             else
                 rerror = 0.0_prec
                 aerror = 0.9_prec
+                !aerror = mindepth
             endif
 
             h_0  = max(0.0_prec,h)
@@ -155,6 +157,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     else   !*no flow to route
         qdc = 0.0_prec
         !qdc = -444.4
+        velc = 0.0_prec
         depthc = 0.0_prec
     end if !*if(ql .gt. 0.0 .or. ...
 
