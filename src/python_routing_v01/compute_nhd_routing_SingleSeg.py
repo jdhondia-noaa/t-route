@@ -174,8 +174,7 @@ def in_wsl() -> bool:
     """
     WSL is thought to be the only common Linux kernel with Microsoft in the name.
     """
-
-    return "Microsoft" in os.uname().release
+    return "microsoft" in os.uname().release.lower()
 
 
 if COMPILE:
@@ -331,8 +330,9 @@ def compute_network(
                 else:
                     compute_mc_reach_up2down(
                         flowveldepth=flowveldepth,
-                        qup_reach=qup_reach,
-                        quc_reach=quc_reach,
+                        qlateral=qlateral,
+                        qup=qup_reach,
+                        quc=quc_reach,
                         head_segment=head_segment,
                         reach=reach,
                         supernetwork_data=supernetwork_data,
@@ -414,12 +414,14 @@ def compute_reach_upstream_flows(
         upstreams_list = connections[reach["reach_head"]]["upstreams"]
         us_flowveldepth = flowveldepth
 
+
+
     for us in upstreams_list:
         if us != supernetwork_data["terminal_code"]:  # Not Headwaters
-            quc += us_flowveldepth[us]["flowval"][ts]
-
+            quc += us_flowveldepth[us]["flowval"][-1]
             if ts > 0:
-                qup += us_flowveldepth[us]["flowval"][ts - 1]
+                qup += us_flowveldepth[us]["flowval"][-2]
+                print(upstreams_list, quc, qup)
 
     if assume_short_ts:
         quc = qup
@@ -430,8 +432,9 @@ def compute_reach_upstream_flows(
 # TODO: generalize with a direction flag
 def compute_mc_reach_up2down(
     flowveldepth,
-    qup_reach,
-    quc_reach,
+    qlateral,
+    qup,
+    quc,
     head_segment=None,
     reach=None,
     supernetwork_data=None,
@@ -449,8 +452,8 @@ def compute_mc_reach_up2down(
             f"\nreach: {head_segment} (order: {reach['seqorder']} n_segs: {len(reach['segments'])})"
         )
 
-    qup = qup_reach
-    quc = quc_reach
+    #qup = qup_reach
+    #quc = quc_reach
 
     current_segment = reach["reach_head"]
     # next_segment = connections[current_segment]["downstream"]
@@ -474,6 +477,7 @@ def compute_mc_reach_up2down(
         qts = int(ts / qts_subdivisions)
         qlat = qlateral[current_segment]["qlatval"][qts]
 
+        print(current_segment, qlat, qts)
         if ts > 0:
             qdp = flowveldepth[current_segment]["flowval"][-1]
             velp = flowveldepth[current_segment]["velval"][-1]
@@ -504,20 +508,25 @@ def compute_mc_reach_up2down(
         # storage
         volumec = dt * (quc - qdc + qlat)
         # TODO: This qlatCum is invalid as a cumulative value unless time is factored in
-        qlatCum = qlat
+        qlatCum = qlat * dt
         if ts > 0:
             volumec = volumec + flowveldepth[current_segment]["storageval"][-1]
             qlatCum = qlatCum + flowveldepth[current_segment]["qlatCumval"][-1]
 
         # for next segment qup / quc use the previous flow values
-        if ts > 0:
-            qup = flowveldepth[current_segment]["flowval"][-1]  # input for next segment
-        else:
-            qup = 0
-
-        quc = qdc  # input for next segment
+        # if ts > 0:
+        #     qup = flowveldepth[current_segment]["flowval"][-1]  # input for next segment
+        # else:
+        #     qup = 0
+        #
+        # quc = qdc  # input for next segment
+        # if assume_short_ts:
+        #     quc = qup
+        qup = qdp
+        quc = qdc
         if assume_short_ts:
-            quc = qup
+            quc = qup = qdp
+
 
         # update flowveldepth values for currentsegment for current timestep
         # flowveldepth[current_segment]["qlatval"].append(qlat)  # NEVER UPDATED
@@ -610,12 +619,12 @@ def compute_level_pool_reach_up2down(
 
     volumec = dt * (quc - qdc + qlat)
     # TODO: This qlatCum is invalid as a cumulative value unless time is factored in
-    qlatCum = qlat
+    qlatCum = qlat *dt
     if ts > 0:
         volumec = volumec + flowveldepth[current_segment]["storageval"][-1]
         qlatCum = qlatCum + flowveldepth[current_segment]["qlatCumval"][-1]
 
-        
+
     flowveldepth[current_segment]["flowval"].append(qdc)
     flowveldepth[current_segment]["depthval"].append(depthc)
     flowveldepth[current_segment]["velval"].append(0)
